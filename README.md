@@ -25,6 +25,11 @@ We approximate the contour using cv2.arcLength and cv2.approxPolyDP, which give 
 Finally a perspective transform is applied on the marked region in the original image using the four_point_transform function of the imutils.perspective module to extract the Sudoku in a top-down view.
 
 ### Digit Recognition and Sudoku Matrix formation
+Once the Sudoku image is extracted from the frame, we divide it into a 9x9 grid assuming that it is a regular sudoku puzzle. We again perform the preprocessing steps, this time on individual cells extracted from the grid image. We also use the clear_border function from scikit-image package to remove extraneous pixels, that correspond to the grid lines in the sudoku. Finally an erosion is performed. Currently, it is assumed that the digit will lie in the center of the extracted cell window, and is thus directly fed into the MNIST-trained Keras model that is used to classify the digits. 
+
+A count of the non zero pixels is done, so as to distinguish empty cells from the marked cells. If the count is less than some threshold, we assign zero to that grid cell, else, run our classifier to recognize the digit. The classifier used had a 99.25% test accuracy on the MNIST handwritten digits dataset. 
+
+Results obtained currently are not that good, probably because sometimes the digit is not in the centre of the window, or erosion/dilation is not done correctly. For example, sometimes cell boundaries are not removed entirely and are classified as 1s or 7s. Will work on it.
 
 ### Solve the sudoku
 For solving the sudoku, a backtracking algorithm is used, which is a special case type of Brute Force search. 
@@ -33,6 +38,8 @@ A cell is tried with digits from 1-9 and checked for validity. If not a valid mo
 
 ## Libraries used
 OpenCV-3.2.0
+keras with tensorflow backend
+scikit-learn
 numpy
 matplotlib.pyplot
 imutils

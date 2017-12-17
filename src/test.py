@@ -10,71 +10,54 @@ from sudoku import Sudoku
 from keras.models import load_model
 
 
-cap = cv2.VideoCapture(0)
-corners = []
-captured = False
 
-while(cap.isOpened()):
-	ret,frame = cap.read()
 
-	## PREPROCESSING
+## PREPROCESSING
+frame = cv2.imread("../ims/sudoku7.jpg")
+img = imutils.resize(frame,height=400)
+# cv2.imshow("Original",img)
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+blurred = cv2.GaussianBlur(gray,(5,5),0)
+# blurred = cv2.bilateralFilter(gray, 11, 17, 17)
+#apply adaptive thresholding
+thres = cv2.adaptiveThreshold(blurred,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,13,4)
+# cv2.imshow("Thresholded",thres)
 
-	img = imutils.resize(frame,height=400)
-	# cv2.imshow("Original",img)
-	gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-	blurred = cv2.GaussianBlur(gray,(5,5),0)
-	# blurred = cv2.bilateralFilter(gray, 11, 17, 17)
-	#apply adaptive thresholding
-	thres = cv2.adaptiveThreshold(blurred,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,13,4)
-	cv2.imshow("Thresholded",thres)
+## EXTRACTION
 
-	## EXTRACTION
+#capture
+# find contours in the thresholded image
+_,cnts,_ = cv2.findContours(thres.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+# store largest 4 contours since sudoku contour must be large
+cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:4]
+cntSudoku = None
 
-	key = cv2.waitKey(1) & 0xFF 
-	if key == ord('q'):
-		#quit
-		cap.release()
-		cv2.destroyAllWindows()
-		exit(0)
+#since cv2.findContours is a destructive method
+imgCp1 = img.copy() 
 
-	elif key == ord('c'):
-		#capture
-		# find contours in the thresholded image
-		_,cnts,_ = cv2.findContours(thres.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-		# store largest 4 contours since sudoku contour must be large
-		cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:4]
-		cntSudoku = None
-		
-		#since cv2.findContours is a destructive method
-		imgCp1 = img.copy() 
+for c in cnts:
+	# approximate the contour
+	peri = cv2.arcLength(c, True)
+	approx = cv2.approxPolyDP(c, 0.02 * peri, True)
 
-		for c in cnts:
-			# approximate the contour
-			peri = cv2.arcLength(c, True)
-			approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+	# if our approximated contour has four points, then
+	# we can assume that we have found our screen
+	if len(approx) == 4:
+		cntSudoku = approx     
 
-			# if our approximated contour has four points, then
-			# we can assume that we have found our screen
-			if len(approx) == 4:
-				cntSudoku = approx     
+		cv2.drawContours(imgCp1,[cntSudoku],-1,(0,0,255),3)
+		# cv2.imshow("Contours",imgCp1)
+		break
 
-				cv2.drawContours(imgCp1,[cntSudoku],-1,(0,0,255),3)
-				captured = True
-				cap.release()
-				cv2.imshow("Contours",imgCp1)
-				break
-
-		if captured:
-			break
 
 #apply perspective transform
 imgSudoku = four_point_transform(img,cntSudoku.reshape(-1,2))
-cv2.imshow("Sudoku Warped",imgSudoku)
-key = cv2.waitKey(0)
+# cv2.imshow("Sudoku Warped",imgSudoku)
+# key = cv2.waitKey(0)
 
-# Proceed only if the image is a Sudoku
-if key&0xFF == ord("q"):
-	exit()
+# # Proceed only if the image is a Sudoku
+# if key&0xFF == ord("q"):
+# 	exit()
 
 ## IMAGE RECOGNITION (Using PreTrained Model)
 
@@ -101,7 +84,7 @@ for i in range(0,imgSudoku.shape[0],slideY):
 		#Resize the cell to MNIST dimensions
 		digit = cv2.resize(S_cell,(28,28))
 		# Apply Adaptive Thresholding on inv image
-		digit = cv2.adaptiveThreshold(digit,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,35,3)
+		digit = cv2.adaptiveThreshold(digit,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV,35,4)
 		digit = clear_border(digit)
 		
 		# # digit = cv2.morphologyEx(digit,cv2.MORPH_OPEN,np.ones((2,2),np.uint8))
@@ -111,7 +94,7 @@ for i in range(0,imgSudoku.shape[0],slideY):
 
 		n_zero = cv2.countNonZero(digit)
 
-		if n_zero<50:
+		if n_zero<30:
 			pred_class = 0
 		else:
 			pred = imrecModel.predict([digit.reshape(1,28,28,1)/255.])
