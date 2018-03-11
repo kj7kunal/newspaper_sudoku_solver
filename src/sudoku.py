@@ -76,6 +76,8 @@ class Sudoku:
 			return S.valar
 		raise("Sudoku cannot be solved!!!")
 
+
+
 # if __name__=="__main__":
      
 #     grid=[[3,0,6,5,0,8,4,0,0],
